@@ -9,91 +9,142 @@ from PyQt6.QtWidgets import QApplication, QComboBox, QLabel, QMainWindow, QPushB
 
 
 class TicTacToeGUI(QMainWindow):
-    def _init(self):
+    def __init__(self):
         super().__init__()
 
-        # Load the UI file
-        ui_path = os.path.join(os.path.dirname(__file__), "main_window.ui")
-        uic.loadUi(ui_path, self)
+        # UI fájl betöltése
+        self.load_ui()
 
-        # Játékmező állapot tárolása
+        # Játék állapot inicializálása
+        self.init_game_state()
+
+        # UI beállítások
+        self.setup_ui()
+
+        # Jelek összekapcsolása
+        self.connect_signals()
+
+    def load_ui(self):
+        """UI fájl betöltése"""
+        try:
+            ui_path = os.path.join(os.path.dirname(__file__), "main_window.ui")
+            print(f"UI fájl elérési útja: {ui_path}")
+
+            if not os.path.exists(ui_path):
+                raise FileNotFoundError(f"UI fájl nem található: {ui_path}")
+
+            uic.loadUi(ui_path, self)
+            print("UI fájl sikeresen betöltve")
+
+        except Exception as e:
+            print(f"Hiba a UI betöltésekor: {e}")
+
+    def init_game_state(self):
+        """Játék állapot inicializálása"""
         self.board = np.zeros((3, 3), dtype=int)
-
-        self.current_player = 1
+        self.current_player = 1  # 1 = X, -1 = O
         self.game_over = False
-        self.winnner = None
+        self.winner = None
 
-        # UI elemek
-        self.board_buttons = [
-            self.pushButton_1,
-            self.pushButton_2,
-            self.pushButton_3,
-            self.pushButton_4,
-            self.pushButton_5,
-            self.pushButton_6,
-            self.pushButton_7,
-            self.pushButton_8,
-            self.pushButton_9,
-        ]
+    def setup_ui(self):
+        """UI elemek beállítása"""
+        try:
+            # Gombok listája
+            self.board_buttons = [
+                self.pushButton_1,
+                self.pushButton_2,
+                self.pushButton_3,
+                self.pushButton_4,
+                self.pushButton_5,
+                self.pushButton_6,
+                self.pushButton_7,
+                self.pushButton_8,
+                self.pushButton_9,
+            ]
 
-        self.init_ui()
-        self.connect_sinagls()
+            # Panel címek beállítása
+            if hasattr(self, "game_panel"):
+                self.game_panel.setTitle("Játéktábla")
+            if hasattr(self, "control_panel"):
+                self.control_panel.setTitle("Vezérlőpult")
 
-    def init_ui(self):
-        self.game_panel.setTitle("Játéktábla")
-        self.control_panel.setTitle("Vezérlőpult")
+            self.result_text.setText("")
 
-        # Játéktábla gombjainak beállítása
-        for i in range(3):
-            for j in range(3):
-                button = self.board_buttons[i][j]
+            # Gombok stílusának beállítása
+            button_style = """
+                QPushButton {
+                    border: 2px solid #333;
+                    border-radius: 10px;
+                    background-color: white;
+                    font-size: 24px;
+                    font-weight: bold;
+                    min-height: 80px;
+                    min-width: 80px;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+                QPushButton:pressed {
+                    background-color: #d0d0d0;
+                }
+            """
+
+            for button in self.board_buttons:
                 button.setText("")
                 button.setFont(QFont("Arial", 24, QFont.Weight.Bold))
-                button.setStyleSheet(
-                    """
-                    QPushButton {
-                        border: 2px solid #333;
-                        border-radius: 10px;
-                        background-color: white;
-                        font-size: 24px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #e0e0e0;
-                    }
-                    QPushButton:pressed {
-                        background-color: #d0d0d0;
-                    }
-                    """
-                )
+                button.setStyleSheet(button_style)
 
-    def connect_sinals(self):
-        for i in range(3):
-            for j in range(3):
-                button = self.board_buttons[i][j]
-                button.clicked.connect(lambda checked, row=i, col=j: self.make_move(row, col))
+            print("UI beállítások alkalmazva")
 
-        self.new_game.clicked.connect(self.start_new_game)
-        self.ai_training.clicked.connect(self.start_ai_training)
-        self.game_mode.currentTextChanged.connect(self.on_game_mode_changed)
+        except Exception as e:
+            print(f"Hiba az UI beállításakor: {e}")
+
+    def connect_signals(self):
+        """Jelek és slotok összekapcsolása"""
+        try:
+            # Játéktábla gombok
+            for i, button in enumerate(self.board_buttons):
+                row, col = i // 3, i % 3
+                button.clicked.connect(lambda checked, r=row, c=col: self.make_move(r, c))
+
+            # Vezérlő gombok
+            if hasattr(self, "new_game"):
+                self.new_game.clicked.connect(self.start_new_game)
+            if hasattr(self, "ai_training"):
+                self.ai_training.clicked.connect(self.start_ai_training)
+            if hasattr(self, "game_mode"):
+                self.game_mode.currentTextChanged.connect(self.on_game_mode_changed)
+
+            print("Jelek sikeresen összekapcsolva")
+
+        except Exception as e:
+            print(f"Hiba a jelek összekapcsolásakor: {e}")
 
     def make_move(self, row, col):
+        """Lépés végrehajtása"""
+        print(f"Lépés: sor {row}, oszlop {col}")
+
         if self.game_over or self.board[row][col] != 0:
             return
 
+        # Emberi játékos lépése
         self.board[row][col] = self.current_player
         self.update_board_display()
 
+        # Győzelem vagy döntetlen ellenőrzése
         if self.check_winner() or self.is_board_full():
             self.end_game()
             return
 
+        # Játékos váltás
         self.current_player *= -1
 
-        if self.game_over.currentText() == "Ember vs AI" and self.current_player == -1:
-            self.ai_move()
+        # AI lépés, ha szükséges
+        if hasattr(self, "game_mode") and self.game_mode.currentText() == "Ember vs AI" and self.current_player == -1:
+            QTimer.singleShot(500, self.ai_move)
 
     def ai_move(self):
+        """AI lépés végrehajtása"""
         if self.game_over:
             return
 
@@ -105,37 +156,38 @@ class TicTacToeGUI(QMainWindow):
                     available_moves.append((i, j))
 
         if available_moves:
-            # Egyszerű AI: random lépés
             import random
 
             row, col = random.choice(available_moves)
 
-            # AI lépés végrehajtása
             self.board[row][col] = self.current_player
             self.update_board_display()
 
-            # Játék vége ellenőrzése
             if self.check_winner() or self.is_board_full():
                 self.end_game()
                 return
 
-            # Játékos váltás vissza az emberre
             self.current_player *= -1
 
     def update_board_display(self):
+        """Játéktábla megjelenítésének frissítése"""
         for i in range(3):
             for j in range(3):
-                button = self.board_buttons[i][j]
+                button_index = i * 3 + j
+                button = self.board_buttons[button_index]
                 value = self.board[i][j]
 
                 if value == 1:
                     button.setText("X")
+                    button.setStyleSheet(button.styleSheet() + "color: blue;")
                 elif value == -1:
                     button.setText("O")
+                    button.setStyleSheet(button.styleSheet() + "color: red;")
                 else:
                     button.setText("")
 
     def check_winner(self):
+        """Győztes ellenőrzése"""
         # Sorok ellenőrzése
         for row in self.board:
             if abs(sum(row)) == 3:
@@ -161,79 +213,37 @@ class TicTacToeGUI(QMainWindow):
         return False
 
     def is_board_full(self):
-        """Tábla tele van-e"""
+        """Ellenőrzi, hogy a tábla tele van-e"""
         return not any(0 in row for row in self.board)
 
     def end_game(self):
         """Játék befejezése"""
         self.game_over = True
 
+        # Statisztikák frissítése
+        if self.winner == 1:
+            self.result_text = "X nyert!"
+        elif self.winner == -1:
+            self.result_text = "O nyert!"
+        else:
+            self.result_text = "Döntetlen!"
+
         # Gombok letiltása
-        for i in range(3):
-            for j in range(3):
-                self.board_buttons[i][j].setEnabled(False)
+        for button in self.board_buttons:
+            button.setEnabled(False)
 
     def start_new_game(self):
         """Új játék indítása"""
-        # Játék állapot visszaállítása
         self.board = np.zeros((3, 3), dtype=int)
         self.current_player = 1
         self.game_over = False
         self.winner = None
 
         # UI frissítése
-        for i in range(3):
-            for j in range(3):
-                button = self.board_buttons[i][j]
-                button.setText("")
-                button.setEnabled(True)
-                button.setStyleSheet(
-                    """
-                    QPushButton {
-                        border: 2px solid #333;
-                        border-radius: 10px;
-                        background-color: white;
-                        font-size: 24px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #e0e0e0;
-                    }
-                    QPushButton:pressed {
-                        background-color: #d0d0d0;
-                    }
-                """
-                )
+        for button in self.board_buttons:
+            button.setText("")
+            button.setEnabled(True)
 
-    def start_ai_training(self):
-        """AI edzés indítása"""
-        self.update_status("AI edzés folyamatban...")
-        # Itt később implementáljuk a RL edzést
+        self.result_text.setText("")
 
-        # Egyelőre csak egy üzenet
-        from PyQt6.QtWidgets import QMessageBox
-
-        QMessageBox.information(
-            self,
-            "AI Edzés",
-            "AI edzés funkció hamarosan elérhető!\n" "Itt fog történni a Reinforcement Learning edzés.",
-        )
-
-
-def main():
-    """Fő alkalmazás indítása"""
-    app = QApplication(sys.argv)
-
-    # Alkalmazás beállítások
-    app.setApplicationName("Tic-Tac-Toe RL")
-    app.setApplicationVersion("1.0")
-
-    # Fő ablak létrehozása
-    window = TicTacToeGUI()
-    window.show()
-
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main()
+        self.update_board_display()

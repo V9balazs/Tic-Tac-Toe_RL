@@ -35,6 +35,12 @@
        <height>100</height>
       </rect>
      </property>
+     <property name="font">
+      <font>
+       <pointsize>22</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
      <property name="text">
       <string/>
      </property>
@@ -50,6 +56,12 @@
        <width>100</width>
        <height>100</height>
       </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>22</pointsize>
+       <bold>true</bold>
+      </font>
      </property>
      <property name="text">
       <string/>
@@ -67,6 +79,12 @@
        <height>100</height>
       </rect>
      </property>
+     <property name="font">
+      <font>
+       <pointsize>22</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
      <property name="text">
       <string/>
      </property>
@@ -82,6 +100,12 @@
        <width>100</width>
        <height>100</height>
       </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>22</pointsize>
+       <bold>true</bold>
+      </font>
      </property>
      <property name="text">
       <string/>
@@ -99,6 +123,12 @@
        <height>100</height>
       </rect>
      </property>
+     <property name="font">
+      <font>
+       <pointsize>22</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
      <property name="text">
       <string/>
      </property>
@@ -114,6 +144,12 @@
        <width>100</width>
        <height>100</height>
       </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>22</pointsize>
+       <bold>true</bold>
+      </font>
      </property>
      <property name="text">
       <string/>
@@ -131,6 +167,12 @@
        <height>100</height>
       </rect>
      </property>
+     <property name="font">
+      <font>
+       <pointsize>22</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
      <property name="text">
       <string/>
      </property>
@@ -146,6 +188,12 @@
        <width>100</width>
        <height>100</height>
       </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>22</pointsize>
+       <bold>true</bold>
+      </font>
      </property>
      <property name="text">
       <string/>
@@ -163,12 +211,37 @@
        <height>100</height>
       </rect>
      </property>
+     <property name="font">
+      <font>
+       <pointsize>22</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
      <property name="text">
       <string/>
      </property>
      <attribute name="buttonGroup">
       <string notr="true">buttonGroup</string>
      </attribute>
+    </widget>
+    <widget class="QLabel" name="result_text">
+     <property name="geometry">
+      <rect>
+       <x>200</x>
+       <y>29</y>
+       <width>101</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>14</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
     </widget>
    </widget>
    <widget class="QGroupBox" name="control_panel">
