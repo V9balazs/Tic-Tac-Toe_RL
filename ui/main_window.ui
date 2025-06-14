@@ -37,7 +37,7 @@
      </property>
      <property name="font">
       <font>
-       <pointsize>22</pointsize>
+       <pointsize>30</pointsize>
        <bold>true</bold>
       </font>
      </property>
@@ -59,7 +59,7 @@
      </property>
      <property name="font">
       <font>
-       <pointsize>22</pointsize>
+       <pointsize>30</pointsize>
        <bold>true</bold>
       </font>
      </property>
@@ -81,7 +81,7 @@
      </property>
      <property name="font">
       <font>
-       <pointsize>22</pointsize>
+       <pointsize>30</pointsize>
        <bold>true</bold>
       </font>
      </property>
@@ -103,7 +103,7 @@
      </property>
      <property name="font">
       <font>
-       <pointsize>22</pointsize>
+       <pointsize>30</pointsize>
        <bold>true</bold>
       </font>
      </property>
@@ -125,7 +125,7 @@
      </property>
      <property name="font">
       <font>
-       <pointsize>22</pointsize>
+       <pointsize>30</pointsize>
        <bold>true</bold>
       </font>
      </property>
@@ -147,7 +147,7 @@
      </property>
      <property name="font">
       <font>
-       <pointsize>22</pointsize>
+       <pointsize>30</pointsize>
        <bold>true</bold>
       </font>
      </property>
@@ -169,7 +169,7 @@
      </property>
      <property name="font">
       <font>
-       <pointsize>22</pointsize>
+       <pointsize>30</pointsize>
        <bold>true</bold>
       </font>
      </property>
@@ -191,7 +191,7 @@
      </property>
      <property name="font">
       <font>
-       <pointsize>22</pointsize>
+       <pointsize>30</pointsize>
        <bold>true</bold>
       </font>
      </property>
@@ -213,7 +213,7 @@
      </property>
      <property name="font">
       <font>
-       <pointsize>22</pointsize>
+       <pointsize>30</pointsize>
        <bold>true</bold>
       </font>
      </property>
