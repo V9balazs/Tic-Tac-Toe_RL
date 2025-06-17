@@ -74,7 +74,6 @@ class TicTacToeEnvironment:
             raise ValueError("A játék már véget ért! Használd a reset() metódust.")
 
         if not self.is_valid_action(action):
-            # Érvénytelen lépés büntetése
             return (
                 self.get_state(),
                 -0.1,
@@ -96,18 +95,14 @@ class TicTacToeEnvironment:
         winner = self.check_winner()
         is_draw = self.is_board_full() and winner is None
 
-        # Jutalom számítása
-        reward = self.calculate_reward(winner, is_draw)
-
-        # Játék vége ellenőrzése
+        # JAVÍTÁS: Játék állapot frissítése ELŐBB
         done = winner is not None or is_draw
-
         if done:
             self.update_game_state(winner, is_draw)
-            self.update_stats()
-        else:
-            # Játékos váltás
-            self.current_player = -self.current_player
+            self.update_stats()  # Itt már a helyes game_state van beállítva
+
+        # Jutalom számítása
+        reward = self.calculate_reward(winner, is_draw)
 
         # Info dictionary összeállítása
         info = {
@@ -118,6 +113,10 @@ class TicTacToeEnvironment:
             "valid_actions": self.get_valid_actions() if not done else [],
             "game_state": self.game_state.value,
         }
+
+        # Játékos váltás csak akkor, ha a játék nem ért véget
+        if not done:
+            self.current_player = -self.current_player
 
         return self.get_state(), reward, done, info
 
@@ -326,8 +325,10 @@ class TicTacToeEnvironment:
     def update_stats(self):
         """Statisztikák frissítése"""
         self.stats["games_played"] += 1
+
         self.stats["total_moves"] += self.move_count
 
+        # A game_state alapján frissítjük a statisztikákat
         if self.game_state == GameState.X_WINS:
             self.stats["x_wins"] += 1
         elif self.game_state == GameState.O_WINS:
@@ -426,6 +427,7 @@ class TicTacToeEnvironment:
             Dict[str, Any]: Játék eredménye és statisztikái
         """
         self.reset()
+
         moves = []
 
         while self.game_state == GameState.ONGOING:
@@ -434,12 +436,16 @@ class TicTacToeEnvironment:
                 break
 
             action = random.choice(valid_actions)
+
+            # JAVÍTÁS: Aktuális játékos mentése a lépés előtt
+            current_player_before_move = self.current_player
+
             state, reward, done, info = self.step(action)
 
             moves.append(
                 {
                     "action": action,
-                    "player": info.get("current_player", self.current_player),
+                    "player": current_player_before_move,  # A lépést végrehajtó játékos
                     "reward": reward,
                     "state": state.copy(),
                 }
@@ -449,11 +455,12 @@ class TicTacToeEnvironment:
                 break
 
         return {
-            "winner": info.get("winner"),
-            "is_draw": info.get("is_draw", False),
+            "winner": info.get("winner") if "info" in locals() else None,
+            "is_draw": info.get("is_draw", False) if "info" in locals() else False,
             "moves": moves,
             "total_moves": len(moves),
             "final_state": self.get_state(),
+            "game_state": self.game_state.value,
         }
 
     def evaluate_position(self, player: int) -> float:
