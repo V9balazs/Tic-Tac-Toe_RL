@@ -21,25 +21,21 @@ def main():
     # QApplication létrehozása
     app = QApplication(sys.argv)
 
-    # Alkalmazás beállítások
-    app.setApplicationName("Tic-Tac-Toe RL")
-    app.setApplicationVersion("1.0")
-    app.setOrganizationName("AI Training")
-
-    # High DPI támogatás
-    app.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
-    app.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
-
     try:
         # Fő ablak létrehozása és megjelenítése
         window = TicTacToeGUI()
         window.show()
+
+        print("Alkalmazás elindítva!")
 
         # Alkalmazás futtatása
         sys.exit(app.exec())
 
     except Exception as e:
         print(f"Hiba az alkalmazás indításakor: {e}")
+        import traceback
+
+        traceback.print_exc()
         sys.exit(1)
 
 
