@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 # Konstansok importálása
-from constants import (
+from .constants import (
     BOARD_SIZE,
     EMPTY_CELL,
     PLAYER_O,

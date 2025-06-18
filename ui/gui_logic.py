@@ -5,7 +5,14 @@ import numpy as np
 from PyQt6 import uic
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QApplication, QComboBox, QLabel, QMainWindow, QPushButton
+from PyQt6.QtWidgets import QApplication, QComboBox, QLabel, QMainWindow, QMessageBox, QPushButton
+
+# RL komponensek importálása
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from ai_training.constants import PLAYER_O, PLAYER_X
+from ai_training.q_learning_agent import QLearningAgent
+from ai_training.tictactoe_environment import TicTacToeEnvironment
+from ai_training.training_manager import TrainingManager
 
 
 class TicTacToeGUI(QMainWindow):
@@ -120,10 +127,23 @@ class TicTacToeGUI(QMainWindow):
         except Exception as e:
             print(f"Hiba a jelek összekapcsolásakor: {e}")
 
-    def make_move(self, row, col):
-        """Lépés végrehajtása"""
-        print(f"Lépés: sor {row}, oszlop {col}")
+    def init_ai_components(self):
+        """AI komponensek inicializálása"""
+        self.training_manager = TrainingManager()
+        self.ai_agent = None
 
+        # Próbáljuk betölteni a legjobb modellt
+        try:
+            self.ai_agent = self.training_manager.load_best_agent()
+            if self.ai_agent:
+                print("Legjobb AI modell betöltve")
+            else:
+                print("Nincs betölthető AI modell")
+        except Exception as e:
+            print(f"Hiba az AI betöltésekor: {e}")
+
+    def make_move(self, row, col):
+        """Játékos lépése"""
         if self.game_over or self.board[row][col] != 0:
             return
 
@@ -131,43 +151,57 @@ class TicTacToeGUI(QMainWindow):
         self.board[row][col] = self.current_player
         self.update_board_display()
 
-        # Győzelem vagy döntetlen ellenőrzése
         if self.check_winner() or self.is_board_full():
             self.end_game()
             return
 
-        # Játékos váltás
         self.current_player *= -1
 
-        # AI lépés, ha szükséges
-        if hasattr(self, "game_mode") and self.game_mode.currentText() == "Ember vs AI" and self.current_player == -1:
+        # AI lépés ha szükséges
+        if self.game_mode.currentText() == "Ember vs AI" and self.current_player == PLAYER_O:
             QTimer.singleShot(500, self.ai_move)
 
+    def on_game_mode_changed(self, mode):
+        """Játék mód változása"""
+        print(f"Játék mód változott: {mode}")
+        # Új játék indítása mód váltáskor
+        self.start_new_game()
+
     def ai_move(self):
-        """AI lépés végrehajtása"""
-        if self.game_over:
+        """AI lépése"""
+        if self.game_over or not self.ai_agent:
             return
 
-        # Elérhető pozíciók keresése
-        available_moves = []
-        for i in range(3):
-            for j in range(3):
-                if self.board[i][j] == 0:
-                    available_moves.append((i, j))
+        try:
+            # Environment létrehozása az aktuális állapotból
+            env = TicTacToeEnvironment()
+            env.board = self.board.copy()
+            env.current_player = self.current_player
 
-        if available_moves:
-            import random
+            # Érvényes lépések
+            valid_actions = env.get_valid_actions()
 
-            row, col = random.choice(available_moves)
+            if valid_actions:
+                # AI döntés
+                action = self.ai_agent.get_best_action(env.get_state(), valid_actions, env)
 
-            self.board[row][col] = self.current_player
-            self.update_board_display()
+                # Lépés végrehajtása
+                row, col = action // 3, action % 3
+                self.board[row][col] = self.current_player
+                self.update_board_display()
 
-            if self.check_winner() or self.is_board_full():
-                self.end_game()
-                return
+                # Játék vége ellenőrzése
+                if self.check_winner() or self.is_board_full():
+                    self.end_game()
+                    return
 
-            self.current_player *= -1
+                # Játékos váltás
+                self.current_player *= -1
+
+        except Exception as e:
+            print(f"Hiba az AI lépésekor: {e}")
+            # Fallback: random lépés
+            self.random_ai_move()
 
     def update_board_display(self):
         """Játéktábla megjelenítésének frissítése"""
@@ -212,6 +246,16 @@ class TicTacToeGUI(QMainWindow):
 
         return False
 
+    def start_ai_training(self):
+        """AI edzés indítása"""
+        from ai_training.training_dialog import TrainingDialog
+
+        dialog = TrainingDialog(self.training_manager, self)
+        if dialog.exec() == QMessageBox.DialogCode.Accepted:
+            # Új modell betöltése az edzés után
+            self.ai_agent = self.training_manager.load_best_agent()
+            QMessageBox.information(self, "Edzés", "AI edzés befejezve!")
+
     def is_board_full(self):
         """Ellenőrzi, hogy a tábla tele van-e"""
         return not any(0 in row for row in self.board)
@@ -220,13 +264,14 @@ class TicTacToeGUI(QMainWindow):
         """Játék befejezése"""
         self.game_over = True
 
-        # Statisztikák frissítése
-        if self.winner == 1:
-            self.result_text = "X nyert!"
-        elif self.winner == -1:
-            self.result_text = "O nyert!"
-        else:
-            self.result_text = "Döntetlen!"
+        # Eredmény megjelenítése
+        if hasattr(self, "result_label"):  # Ha van result_label widget
+            if self.winner == 1:
+                self.result_label.setText("X nyert!")
+            elif self.winner == -1:
+                self.result_label.setText("O nyert!")
+            else:
+                self.result_label.setText("Döntetlen!")
 
         # Gombok letiltása
         for button in self.board_buttons:

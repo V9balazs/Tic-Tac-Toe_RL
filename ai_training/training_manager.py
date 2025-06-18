@@ -12,7 +12,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-from constants import (
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from q_learning_agent import QLearningAgent
+from tictactoe_environment import TicTacToeEnvironment, create_environment
+
+from .constants import (
     DISCOUNT_FACTOR,
     EPSILON_DECAY,
     EPSILON_END,
@@ -24,9 +28,6 @@ from constants import (
     PLAYER_X,
     TRAINING_EPISODES,
 )
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
-from q_learning_agent import QLearningAgent
-from tictactoe_environment import TicTacToeEnvironment, create_environment
 
 
 class TrainingWorker(QThread):

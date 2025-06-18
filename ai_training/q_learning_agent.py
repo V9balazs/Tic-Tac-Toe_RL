@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 # Konstansok importálása
-from constants import (
+from .constants import (
     DISCOUNT_FACTOR,
     EMPTY_CELL,
     EPSILON_DECAY,
@@ -32,8 +32,7 @@ from constants import (
     TRAINING_EPISODES,
     TRAINING_STATS_FILE,
 )
-
-from tictactoe_environment import TicTacToeEnvironment
+from .tictactoe_environment import TicTacToeEnvironment
 
 
 class QLearningAgent:
