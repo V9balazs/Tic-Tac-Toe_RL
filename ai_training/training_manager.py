@@ -244,37 +244,64 @@ class TrainingManager:
             if log_callback:
                 log_callback(f"{stage_name} kezdése ({episodes} epizód)...")
 
-            if opponent_type == "random":
-                # Random ellenfél
-                stage_result = agent.train(num_episodes=episodes, opponent_agent=None, verbose=False)
-            elif opponent_type == "self":
-                # Self-play
-                stage_result = agent.self_play_training(num_episodes=episodes, verbose=False)
-            else:
-                # Egyéb ellenfél típusok...
-                stage_result = agent.train(num_episodes=episodes, opponent_agent=None, verbose=False)
+            try:
+                if opponent_type == "random":
+                    # Random ellenfél
+                    stage_result = agent.train(num_episodes=episodes, opponent_agent=None, verbose=False)
+                elif opponent_type == "self":
+                    # Self-play
+                    stage_result = agent.self_play_training(num_episodes=episodes, verbose=False)
+                else:
+                    # Egyéb ellenfél típusok...
+                    stage_result = agent.train(num_episodes=episodes, opponent_agent=None, verbose=False)
 
-            total_episodes += episodes
-            stage_results.append(
-                {"stage": stage_name, "episodes": episodes, "opponent": opponent_type, "result": stage_result}
-            )
+                total_episodes += episodes
 
-            # Progress callback
-            if progress_callback:
-                progress_callback(total_episodes, agent.get_stats())
+                # Stage eredmény tisztítása (agent objektum eltávolítása)
+                clean_stage_result = {}
+                for key, value in stage_result.items():
+                    if key != "agent" and not isinstance(value, QLearningAgent):
+                        clean_stage_result[key] = value
 
-            if log_callback:
-                log_callback(
-                    f"{stage_name} befejezve. Győzelmi arány: {stage_result['final_evaluation']['win_rate']:.1%}"
+                stage_info = {
+                    "stage": stage_name,
+                    "episodes": episodes,
+                    "opponent": opponent_type,
+                    "result": clean_stage_result,
+                }
+
+                stage_results.append(stage_info)
+
+                # Progress callback
+                if progress_callback:
+                    progress_callback(total_episodes, agent.get_stats())
+
+                if log_callback:
+                    final_eval = stage_result.get("final_evaluation", {})
+                    win_rate = final_eval.get("win_rate", 0)
+                    log_callback(f"{stage_name} befejezve. Győzelmi arány: {win_rate:.1%}")
+
+            except Exception as e:
+                error_msg = f"Hiba a {stage_name} során: {str(e)}"
+                if log_callback:
+                    log_callback(error_msg)
+                print(error_msg)
+
+                # Hiba esetén is adjunk vissza valamilyen eredményt
+                stage_results.append(
+                    {"stage": stage_name, "episodes": episodes, "opponent": opponent_type, "result": {"error": str(e)}}
                 )
 
-        return {
+        # Végső eredmény összeállítása
+        final_result = {
             "type": "curriculum",
-            "agent": agent,
+            "agent": agent,  # Ez lesz eltávolítva a mentéskor
             "stages": stage_results,
             "total_episodes": total_episodes,
             "timestamp": datetime.now().isoformat(),
         }
+
+        return final_result
 
     def evaluate_agents(self, agents: List[QLearningAgent], num_games: int = 1000) -> Dict[str, Any]:
         """
@@ -391,24 +418,41 @@ class TrainingManager:
         """
         start_time = time.time()
 
-        if training_type == "random":
-            results = self.train_against_random(num_episodes, agent_params, progress_callback, log_callback)
-        elif training_type == "self_play":
-            results = self.train_self_play(num_episodes, agent_params, progress_callback, log_callback)
-        elif training_type == "curriculum":
-            if not curriculum_stages:
-                curriculum_stages = self.get_default_curriculum()
-            results = self.curriculum_training(curriculum_stages, progress_callback, log_callback)
-        else:
-            raise ValueError(f"Ismeretlen edzés típus: {training_type}")
+        try:
+            if training_type == "random":
+                results = self.train_against_random(num_episodes, agent_params, progress_callback, log_callback)
+            elif training_type == "self_play":
+                results = self.train_self_play(num_episodes, agent_params, progress_callback, log_callback)
+            elif training_type == "curriculum":
+                if not curriculum_stages:
+                    curriculum_stages = self.get_default_curriculum()
+                results = self.curriculum_training(curriculum_stages, progress_callback, log_callback)
+            else:
+                raise ValueError(f"Ismeretlen edzés típus: {training_type}")
 
-        # Edzési idő hozzáadása
-        results["training_duration"] = time.time() - start_time
+            # Edzési idő hozzáadása
+            results["training_duration"] = time.time() - start_time
 
-        # Session mentése
-        self.save_training_session(results)
+            # Session mentése
+            session_id = self.save_training_session(results)
+            if session_id:
+                results["session_id"] = session_id
 
-        return results
+            return results
+
+        except Exception as e:
+            error_msg = f"Hiba az edzés során: {str(e)}"
+            if log_callback:
+                log_callback(error_msg)
+            print(error_msg)
+
+            # Hiba esetén is adjunk vissza valamilyen eredményt
+            return {
+                "type": training_type,
+                "error": str(e),
+                "training_duration": time.time() - start_time,
+                "timestamp": datetime.now().isoformat(),
+            }
 
     def get_default_curriculum(self) -> List[Dict[str, Any]]:
         """
@@ -438,6 +482,7 @@ class TrainingManager:
             },
         ]
 
+    # A save_training_session metódus javítása:
     def save_training_session(self, session_data: Dict[str, Any]):
         """
         Edzési session mentése
@@ -445,36 +490,69 @@ class TrainingManager:
         Args:
             session_data: Session adatok
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_id = f"training_session_{timestamp}"
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            session_id = f"training_session_{timestamp}"
 
-        # Session adatok kiegészítése
-        session_data["session_id"] = session_id
-        session_data["timestamp"] = timestamp
+            # Session adatok kiegészítése
+            session_data_copy = session_data.copy()
+            session_data_copy["session_id"] = session_id
+            session_data_copy["timestamp"] = timestamp
 
-        # JSON mentés
-        session_file = os.path.join(LOGS_DIR, f"{session_id}.json")
+            # Agent objektum kezelése
+            agent = None
+            if "agent" in session_data_copy:
+                agent = session_data_copy["agent"]
 
-        # Agent eltávolítása a JSON-ból (nem szerializálható)
-        session_data_copy = session_data.copy()
-        if "agent" in session_data_copy:
-            # Agent statisztikák mentése
-            session_data_copy["agent_stats"] = session_data_copy["agent"].get_stats()
-            session_data_copy["agent_q_table_analysis"] = session_data_copy["agent"].analyze_q_table()
-            del session_data_copy["agent"]
+                # Agent statisztikák és elemzések mentése
+                try:
+                    session_data_copy["agent_stats"] = agent.get_stats()
+                    session_data_copy["agent_q_table_analysis"] = agent.analyze_q_table()
+                    session_data_copy["agent_player"] = agent.player
+                    session_data_copy["agent_epsilon"] = agent.epsilon
+                    session_data_copy["agent_q_table_size"] = len(agent.q_table)
+                except Exception as e:
+                    print(f"Hiba az agent adatok mentésekor: {e}")
+                    session_data_copy["agent_stats"] = {}
+                    session_data_copy["agent_q_table_analysis"] = {"error": str(e)}
 
-        with open(session_file, "w", encoding="utf-8") as f:
-            json.dump(session_data_copy, f, indent=2, ensure_ascii=False)
+                # Agent objektum eltávolítása a JSON-ból
+                del session_data_copy["agent"]
 
-        # Agent modell mentése
-        if "agent" in session_data:
-            model_name = f"model_{session_id}"
-            session_data["agent"].save_model(model_name)
+            # Curriculum stages kezelése (ha van)
+            if "stages" in session_data_copy:
+                for stage in session_data_copy["stages"]:
+                    if "result" in stage and "agent" in stage["result"]:
+                        # Stage-ben lévő agent objektum eltávolítása
+                        del stage["result"]["agent"]
 
-        # Training history frissítése
-        self.training_history["sessions"].append(session_data_copy)
+            # JSON mentés
+            session_file = os.path.join(LOGS_DIR, f"{session_id}.json")
 
-        print(f"Edzési session mentve: {session_id}")
+            with open(session_file, "w", encoding="utf-8") as f:
+                json.dump(session_data_copy, f, indent=2, ensure_ascii=False, default=str)
+
+            # Agent modell mentése (ha van)
+            if agent is not None:
+                try:
+                    model_name = f"model_{session_id}"
+                    agent.save_model(model_name)
+                    session_data_copy["model_saved"] = model_name
+                    print(f"Agent modell mentve: {model_name}")
+                except Exception as e:
+                    print(f"Hiba az agent modell mentésekor: {e}")
+                    session_data_copy["model_saved"] = None
+
+            # Training history frissítése
+            self.training_history["sessions"].append(session_data_copy)
+
+            print(f"Edzési session mentve: {session_id}")
+
+            return session_id
+
+        except Exception as e:
+            print(f"Hiba a session mentésekor: {e}")
+            return None
 
     def load_training_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -801,19 +879,58 @@ class TrainingManager:
         Returns:
             Optional[str]: Legjobb modell session ID-ja vagy None
         """
-        sessions = self.list_training_sessions()
+        try:
+            # Összes modell fájl keresése
+            if not os.path.exists(MODELS_DIR):
+                return None
 
-        if not sessions:
+            model_files = []
+
+            # .pkl fájlok keresése (Q-táblázatok)
+            for filename in os.listdir(MODELS_DIR):
+                if filename.endswith("_qtable.pkl"):
+                    # Fájl információk
+                    file_path = os.path.join(MODELS_DIR, filename)
+                    file_time = os.path.getmtime(file_path)
+
+                    # Modell név kinyerése (qtable.pkl eltávolítása)
+                    model_name = filename.replace("_qtable.pkl", "")
+
+                    # Ellenőrizzük, hogy van-e hozzá params fájl is
+                    params_file = os.path.join(MODELS_DIR, f"{model_name}_params.json")
+                    if os.path.exists(params_file):
+                        model_files.append(
+                            {
+                                "name": model_name,
+                                "time": file_time,
+                                "qtable_file": file_path,
+                                "params_file": params_file,
+                            }
+                        )
+
+            if not model_files:
+                return None
+
+            # Legfrissebb modell keresése
+            latest_model = max(model_files, key=lambda x: x["time"])
+
+            # Session alapú értékelés (ha van session info)
+            sessions = self.list_training_sessions()
+            if sessions:
+                # Próbáljuk megtalálni a megfelelő session-t
+                for session in sessions:
+                    session_id = session.get("session_id", "")
+                    if session_id in latest_model["name"]:
+                        # Ha van győzelmi arány info, azt is figyelembe vesszük
+                        win_rate = session.get("final_win_rate", 0)
+                        print(f"Legfrissebb modell: {latest_model['name']}, győzelmi arány: {win_rate:.1%}")
+                        break
+
+                return latest_model["name"]
+
+        except Exception as e:
+            print(f"Hiba a legjobb modell keresésekor: {e}")
             return None
-
-        # Győzelmi arány alapján rendezés
-        best_session = max(
-            (s for s in sessions if s.get("final_win_rate") is not None),
-            key=lambda x: x.get("final_win_rate", 0),
-            default=None,
-        )
-
-        return best_session.get("session_id") if best_session else None
 
     def load_best_agent(self) -> Optional[QLearningAgent]:
         """
@@ -822,21 +939,61 @@ class TrainingManager:
         Returns:
             Optional[QLearningAgent]: Legjobb agent vagy None
         """
-        best_session_id = self.get_best_model()
-
-        if not best_session_id:
-            return None
-
         try:
+            # Legfrissebb modell keresése
+            best_model_name = self.get_best_model()
+
+            if not best_model_name:
+                print("Nincs betölthető modell")
+                return None
+
+            print(f"Modell betöltése: {best_model_name}")
+
             # Agent létrehozása és modell betöltése
             agent = self.create_agent()
-            model_name = f"model_{best_session_id}"
-            agent.load_model(model_name)
+            agent.load_model(best_model_name)
 
+            print(f"Modell sikeresen betöltve: {best_model_name}")
             return agent
 
         except Exception as e:
             print(f"Hiba a legjobb agent betöltésekor: {e}")
+            return None
+
+    def load_any_available_model(self) -> Optional[QLearningAgent]:
+        """
+        Bármilyen elérhető modell betöltése fallback-ként
+
+        Returns:
+            Optional[QLearningAgent]: Agent vagy None
+        """
+        try:
+            # Keressük az összes .pkl fájlt a models mappában
+            if not os.path.exists(MODELS_DIR):
+                return None
+
+            pkl_files = [f for f in os.listdir(MODELS_DIR) if f.endswith("_qtable.pkl")]
+
+            if not pkl_files:
+                print("Nincs elérhető modell fájl")
+                return None
+
+            # Próbáljuk betölteni az első elérhető modellt
+            for pkl_file in pkl_files:
+                try:
+                    model_name = pkl_file.replace("_qtable.pkl", "")
+                    agent = self.create_agent()
+                    agent.load_model(model_name)
+                    print(f"Fallback modell betöltve: {model_name}")
+                    return agent
+                except Exception as e:
+                    print(f"Nem sikerült betölteni: {model_name} - {e}")
+                    continue
+
+            return None
+
+        except Exception as e:
+            print(f"Hiba a fallback modell betöltésekor: {e}")
             return None
 
     def cleanup_old_sessions(self, keep_count: int = 10):
@@ -915,6 +1072,59 @@ class TrainingManager:
             json.dump(export_data, f, indent=2, ensure_ascii=False)
 
         print(f"Edzési adatok exportálva: {export_path}")
+
+    def list_available_models(self) -> List[Dict[str, Any]]:
+        """
+        Elérhető modellek listázása
+
+        Returns:
+            List[Dict[str, Any]]: Modellek listája
+        """
+        models = []
+
+        try:
+            if not os.path.exists(MODELS_DIR):
+                return models
+
+            # .pkl fájlok keresése
+            for filename in os.listdir(MODELS_DIR):
+                if filename.endswith("_qtable.pkl"):
+                    model_name = filename.replace("_qtable.pkl", "")
+                    file_path = os.path.join(MODELS_DIR, filename)
+                    params_file = os.path.join(MODELS_DIR, f"{model_name}_params.json")
+
+                    if os.path.exists(params_file):
+                        # Fájl információk
+                        file_time = os.path.getmtime(file_path)
+                        file_size = os.path.getsize(file_path)
+
+                        # Paraméterek betöltése
+                        try:
+                            with open(params_file, "r", encoding="utf-8") as f:
+                                params = json.load(f)
+
+                            models.append(
+                                {
+                                    "name": model_name,
+                                    "file_time": file_time,
+                                    "file_size": file_size,
+                                    "timestamp": datetime.fromtimestamp(file_time).isoformat(),
+                                    "q_table_size": params.get("q_table_size", 0),
+                                    "player": params.get("player", 1),
+                                    "stats": params.get("stats", {}),
+                                }
+                            )
+
+                        except Exception as e:
+                            print(f"Hiba a modell paraméterek betöltésekor ({model_name}): {e}")
+
+        except Exception as e:
+            print(f"Hiba a modellek listázásakor: {e}")
+
+        # Időrend szerint rendezés (legfrissebb először)
+        models.sort(key=lambda x: x["file_time"], reverse=True)
+
+        return models
 
     def create_training_worker(self, training_config: Dict[str, Any]) -> TrainingWorker:
         """

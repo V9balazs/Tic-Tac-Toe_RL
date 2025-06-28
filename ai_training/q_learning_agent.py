@@ -593,8 +593,17 @@ class QLearningAgent:
         # Edzés végrehajtása
         results = self.train(num_episodes, opponent, verbose=verbose)
 
-        # Ellenfél statisztikái is
-        results["opponent_stats"] = opponent.get_stats()
+        # Ellenfél statisztikái hozzáadása (agent objektum nélkül)
+        try:
+            opponent_stats = opponent.get_stats()
+            results["opponent_stats"] = opponent_stats
+        except Exception as e:
+            print(f"Hiba az ellenfél statisztikák mentésekor: {e}")
+            results["opponent_stats"] = {"error": str(e)}
+
+        # Agent objektum eltávolítása az eredményből (ha van)
+        if "agent" in results:
+            del results["agent"]
 
         return results
 
@@ -673,49 +682,73 @@ class QLearningAgent:
 
         print(f"Modell mentve: {filename}")
 
+    # A load_model metódus javítása:
+
     def load_model(self, filename: str = "q_learning_model"):
         """
-        Modell betöltése fájlból
+        Modell betöltése fájlból (javított verzió)
 
         Args:
             filename: Fájlnév (kiterjesztés nélkül)
         """
         try:
-            # Q-táblázat betöltése
+            # Q-táblázat fájl elérési útja
             q_table_path = os.path.join(MODELS_DIR, f"{filename}_qtable.pkl")
+            params_path = os.path.join(MODELS_DIR, f"{filename}_params.json")
+
+            # Ellenőrizzük, hogy léteznek-e a fájlok
+            if not os.path.exists(q_table_path):
+                raise FileNotFoundError(f"Q-táblázat fájl nem található: {q_table_path}")
+
+            if not os.path.exists(params_path):
+                raise FileNotFoundError(f"Paraméter fájl nem található: {params_path}")
+
+            # Q-táblázat betöltése
+            print(f"Q-táblázat betöltése: {q_table_path}")
             with open(q_table_path, "rb") as f:
                 q_table_dict = pickle.load(f)
-                # dict -> defaultdict konverzió
-                self.q_table = defaultdict(lambda: defaultdict(lambda: INITIAL_Q_VALUE))
-                for state, actions in q_table_dict.items():
-                    for action, q_value in actions.items():
-                        self.q_table[state][action] = q_value
+
+            # dict -> defaultdict konverzió
+            self.q_table = defaultdict(lambda: defaultdict(lambda: INITIAL_Q_VALUE))
+            for state, actions in q_table_dict.items():
+                for action, q_value in actions.items():
+                    self.q_table[state][action] = q_value
 
             # Modell paraméterek betöltése
-            model_path = os.path.join(MODELS_DIR, f"{filename}_params.json")
-            with open(model_path, "r", encoding="utf-8") as f:
+            print(f"Paraméterek betöltése: {params_path}")
+            with open(params_path, "r", encoding="utf-8") as f:
                 model_data = json.load(f)
 
-                self.player = model_data["player"]
-                self.learning_rate = model_data["learning_rate"]
-                self.discount_factor = model_data["discount_factor"]
-                self.epsilon = model_data["epsilon"]
-                self.epsilon_start = model_data["epsilon_start"]
-                self.epsilon_end = model_data["epsilon_end"]
-                self.epsilon_decay = model_data["epsilon_decay"]
-                self.use_symmetries = model_data["use_symmetries"]
+            # Paraméterek beállítása
+            self.player = model_data.get("player", self.player)
+            self.learning_rate = model_data.get("learning_rate", self.learning_rate)
+            self.discount_factor = model_data.get("discount_factor", self.discount_factor)
+            self.epsilon = model_data.get("epsilon", self.epsilon)
+            self.epsilon_start = model_data.get("epsilon_start", self.epsilon_start)
+            self.epsilon_end = model_data.get("epsilon_end", self.epsilon_end)
+            self.epsilon_decay = model_data.get("epsilon_decay", self.epsilon_decay)
+            self.use_symmetries = model_data.get("use_symmetries", self.use_symmetries)
 
-                # Statisztikák visszaállítása (opcionális)
-                if "stats" in model_data:
-                    self.stats.update(model_data["stats"])
+            # Statisztikák visszaállítása (opcionális)
+            if "stats" in model_data:
+                self.stats.update(model_data["stats"])
 
-            print(f"Modell betöltve: {filename}")
+            print(f"Modell sikeresen betöltve: {filename}")
             print(f"Q-táblázat mérete: {len(self.q_table)} állapot")
+            print(f"Játékos: {self.player}")
+
+            # Modell információk kiírása
+            if "stats" in model_data:
+                stats = model_data["stats"]
+                if "win_rate" in stats:
+                    print(f"Modell győzelmi aránya: {stats['win_rate']:.1%}")
 
         except FileNotFoundError as e:
             print(f"Modell fájl nem található: {e}")
+            raise
         except Exception as e:
             print(f"Hiba a modell betöltésekor: {e}")
+            raise
 
     def analyze_q_table(self) -> Dict[str, Any]:
         """

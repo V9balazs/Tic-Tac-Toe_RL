@@ -9,10 +9,25 @@ from PyQt6.QtWidgets import QApplication, QComboBox, QLabel, QMainWindow, QMessa
 
 # RL komponensek importálása
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from ai_training.constants import PLAYER_O, PLAYER_X
-from ai_training.q_learning_agent import QLearningAgent
-from ai_training.tictactoe_environment import TicTacToeEnvironment
-from ai_training.training_manager import TrainingManager
+
+try:
+    from ai_training.q_learning_agent import QLearningAgent
+    from ai_training.tictactoe_environment import TicTacToeEnvironment
+    from ai_training.training_manager import TrainingManager
+
+    # Konstansok importálása
+    try:
+        from ai_training.constants import PLAYER_O, PLAYER_X
+    except ImportError:
+        # Fallback konstansok ha nincs config fájl
+        PLAYER_X = 1
+        PLAYER_O = -1
+        print("Figyelem: config.constants nem található, alapértelmezett értékek használata")
+except ImportError as e:
+    print(f"Hiba az AI komponensek importálásakor: {e}")
+    # Fallback értékek
+    PLAYER_X = 1
+    PLAYER_O = -1
 
 
 class TicTacToeGUI(QMainWindow):
@@ -24,6 +39,9 @@ class TicTacToeGUI(QMainWindow):
 
         # Játék állapot inicializálása
         self.init_game_state()
+
+        # AI komponensek inicializálása
+        self.init_ai_components()
 
         # UI beállítások
         self.setup_ui()
@@ -127,20 +145,41 @@ class TicTacToeGUI(QMainWindow):
         except Exception as e:
             print(f"Hiba a jelek összekapcsolásakor: {e}")
 
+    # Az init_ai_components metódus módosítása:
+
     def init_ai_components(self):
         """AI komponensek inicializálása"""
-        self.training_manager = TrainingManager()
-        self.ai_agent = None
-
-        # Próbáljuk betölteni a legjobb modellt
         try:
-            self.ai_agent = self.training_manager.load_best_agent()
-            if self.ai_agent:
-                print("Legjobb AI modell betöltve")
-            else:
-                print("Nincs betölthető AI modell")
+            self.training_manager = TrainingManager()
+            self.ai_agent = None
+
+            # Elérhető modellek listázása
+            available_models = self.training_manager.list_available_models()
+
+            if available_models:
+                print(f"Elérhető modellek: {len(available_models)}")
+                for i, model in enumerate(available_models[:3]):  # Első 3 modell
+                    print(f"  {i+1}. {model['name']} - {model['timestamp']}")
+
+            # Próbáljuk betölteni a legjobb modellt
+            try:
+                self.ai_agent = self.training_manager.load_best_agent()
+                if self.ai_agent:
+                    print("AI modell sikeresen betöltve")
+                    # Modell tesztelése
+                    test_result = self.ai_agent.evaluate_against_random(100)
+                    print(f"AI teljesítmény teszt: {test_result['win_rate']:.1%} győzelmi arány")
+                else:
+                    print("Nincs betölthető AI modell")
+            except Exception as e:
+                print(f"Hiba az AI betöltésekor: {e}")
+                self.ai_agent = None
+
         except Exception as e:
-            print(f"Hiba az AI betöltésekor: {e}")
+            print(f"Hiba az AI komponensek inicializálásakor: {e}")
+            # Fallback: None értékek
+            self.training_manager = None
+            self.ai_agent = None
 
     def make_move(self, row, col):
         """Játékos lépése"""
@@ -202,6 +241,35 @@ class TicTacToeGUI(QMainWindow):
             print(f"Hiba az AI lépésekor: {e}")
             # Fallback: random lépés
             self.random_ai_move()
+
+    def random_ai_move(self):
+        """Fallback random AI lépés"""
+        if self.game_over:
+            return
+
+        # Elérhető pozíciók keresése
+        available_moves = []
+        for i in range(3):
+            for j in range(3):
+                if self.board[i][j] == 0:
+                    available_moves.append((i, j))
+
+        if available_moves:
+            import random
+
+            row, col = random.choice(available_moves)
+
+            # AI lépés végrehajtása
+            self.board[row][col] = self.current_player
+            self.update_board_display()
+
+            # Játék vége ellenőrzése
+            if self.check_winner() or self.is_board_full():
+                self.end_game()
+                return
+
+            # Játékos váltás
+            self.current_player *= -1
 
     def update_board_display(self):
         """Játéktábla megjelenítésének frissítése"""
