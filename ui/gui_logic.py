@@ -70,6 +70,7 @@ class TicTacToeGUI(QMainWindow):
         self.current_player = 1  # 1 = X, -1 = O
         self.game_over = False
         self.winner = None
+        self.winning_positions = []
 
     def setup_ui(self):
         """UI elemek beállítása"""
@@ -93,31 +94,75 @@ class TicTacToeGUI(QMainWindow):
             if hasattr(self, "control_panel"):
                 self.control_panel.setTitle("Vezérlőpult")
 
-            self.result_text.setText("")
+            if hasattr(self, "result_text"):
+                self.result_text.setText("")
 
-            # Gombok stílusának beállítása
-            button_style = """
+            # Alapértelmezett gomb stílus
+            self.default_button_style = """
                 QPushButton {
-                    border: 2px solid #333;
+                    border: 3px solid #333;
                     border-radius: 10px;
                     background-color: white;
-                    font-size: 24px;
+                    font-size: 28px;
                     font-weight: bold;
                     min-height: 80px;
                     min-width: 80px;
                 }
                 QPushButton:hover {
-                    background-color: #e0e0e0;
+                    background-color: #f0f0f0;
                 }
                 QPushButton:pressed {
-                    background-color: #d0d0d0;
+                    background-color: #e0e0e0;
                 }
             """
 
+            # X játékos stílus (kék)
+            self.x_button_style = """
+                QPushButton {
+                    border: 3px solid #333;
+                    border-radius: 10px;
+                    background-color: white;
+                    font-size: 28px;
+                    font-weight: bold;
+                    min-height: 80px;
+                    min-width: 80px;
+                    color: #2196F3;
+                }
+            """
+
+            # O játékos stílus (piros)
+            self.o_button_style = """
+                QPushButton {
+                    border: 3px solid #333;
+                    border-radius: 10px;
+                    background-color: white;
+                    font-size: 28px;
+                    font-weight: bold;
+                    min-height: 80px;
+                    min-width: 80px;
+                    color: #F44336;
+                }
+            """
+
+            # Nyerő gomb stílus (zöld háttér)
+            self.winning_button_style = """
+                QPushButton {
+                    border: 3px solid #333;
+                    border-radius: 10px;
+                    background-color: #4CAF50;
+                    font-size: 28px;
+                    font-weight: bold;
+                    min-height: 80px;
+                    min-width: 80px;
+                    color: white;
+                }
+            """
+
+            # Gombok inicializálása
             for button in self.board_buttons:
                 button.setText("")
-                button.setFont(QFont("Arial", 24, QFont.Weight.Bold))
-                button.setStyleSheet(button_style)
+                button.setFont(QFont("Arial", 28, QFont.Weight.Bold))
+                button.setStyleSheet(self.default_button_style)
 
             print("UI beállítások alkalmazva")
 
@@ -240,7 +285,7 @@ class TicTacToeGUI(QMainWindow):
         except Exception as e:
             print(f"Hiba az AI lépésekor: {e}")
             # Fallback: random lépés
-            self.random_ai_move()
+            # self.random_ai_move()
 
     def random_ai_move(self):
         """Fallback random AI lépés"""
@@ -279,21 +324,29 @@ class TicTacToeGUI(QMainWindow):
                 button = self.board_buttons[button_index]
                 value = self.board[i][j]
 
-                if value == 1:
+                if value == 1:  # X játékos
                     button.setText("X")
-                    button.setStyleSheet(button.styleSheet() + "color: blue;")
-                elif value == -1:
+                    button.setStyleSheet(self.x_button_style)
+                elif value == -1:  # O játékos
                     button.setText("O")
-                    button.setStyleSheet(button.styleSheet() + "color: red;")
-                else:
+                    button.setStyleSheet(self.o_button_style)
+                else:  # Üres mező
                     button.setText("")
+                    button.setStyleSheet(self.default_button_style)
+
+        # UI frissítés kényszerítése
+        self.update()
 
     def check_winner(self):
         """Győztes ellenőrzése"""
+
+        self.winning_positions = []
+
         # Sorok ellenőrzése
-        for row in self.board:
-            if abs(sum(row)) == 3:
-                self.winner = 1 if sum(row) == 3 else -1
+        for row in range(3):
+            if abs(sum(self.board[row])) == 3 and 0 not in self.board[row]:
+                self.winner = 1 if sum(self.board[row]) == 3 else -1
+                self.winning_positions = [(row, col) for col in range(3)]
                 return True
 
         # Oszlopok ellenőrzése
@@ -301,18 +354,63 @@ class TicTacToeGUI(QMainWindow):
             col_sum = sum(self.board[row][col] for row in range(3))
             if abs(col_sum) == 3:
                 self.winner = 1 if col_sum == 3 else -1
+                self.winning_positions = [(row, col) for row in range(3)]
                 return True
 
         # Átlók ellenőrzése
         diag1 = sum(self.board[i][i] for i in range(3))
         diag2 = sum(self.board[i][2 - i] for i in range(3))
 
-        for diag in [diag1, diag2]:
-            if abs(diag) == 3:
-                self.winner = 1 if diag == 3 else -1
-                return True
+        diag1 = sum(self.board[i][i] for i in range(3))
+        if abs(diag1) == 3:
+            self.winner = 1 if diag1 == 3 else -1
+            self.winning_positions = [(i, i) for i in range(3)]
+            return True
+
+        diag2 = sum(self.board[i][2 - i] for i in range(3))
+        if abs(diag2) == 3:
+            self.winner = 1 if diag2 == 3 else -1
+            self.winning_positions = [(i, 2 - i) for i in range(3)]
+            return True
 
         return False
+
+    def highlight_winning_positions(self):
+        """Nyerő pozíciók kiemelése zöld háttérrel"""
+
+        for row, col in self.winning_positions:
+            button_index = row * 3 + col
+            button = self.board_buttons[button_index]
+
+            # Nyerő gomb stílusa a játékos alapján
+            if self.winner == 1:  # X nyert
+                winning_style = """
+                    QPushButton {
+                        border: 3px solid #333;
+                        border-radius: 10px;
+                        background-color: #4CAF50;
+                        font-size: 28px;
+                        font-weight: bold;
+                        min-height: 80px;
+                        min-width: 80px;
+                        color: #2196F3;
+                    }
+                """
+            else:  # O nyert
+                winning_style = """
+                    QPushButton {
+                        border: 3px solid #333;
+                        border-radius: 10px;
+                        background-color: #4CAF50;
+                        font-size: 28px;
+                        font-weight: bold;
+                        min-height: 80px;
+                        min-width: 80px;
+                        color: #F44336;
+                    }
+                """
+
+            button.setStyleSheet(winning_style)
 
     def start_ai_training(self):
         """AI edzés indítása"""
@@ -332,14 +430,23 @@ class TicTacToeGUI(QMainWindow):
         """Játék befejezése"""
         self.game_over = True
 
-        # Eredmény megjelenítése
-        if hasattr(self, "result_label"):  # Ha van result_label widget
+        print(f"Játék vége! Győztes: {self.winner}")
+
+        # Eredmény megjelenítése a result_text label-en
+        if hasattr(self, "result_text"):
             if self.winner == 1:
-                self.result_label.setText("X nyert!")
+                self.result_text.setText("X nyert!")
+                self.result_text.setStyleSheet("color: #2196F3; font-weight: bold; font-size: 16px;")
             elif self.winner == -1:
-                self.result_label.setText("O nyert!")
+                self.result_text.setText("O nyert!")
+                self.result_text.setStyleSheet("color: #F44336; font-weight: bold; font-size: 16px;")
             else:
-                self.result_label.setText("Döntetlen!")
+                self.result_text.setText("Döntetlen!")
+                self.result_text.setStyleSheet("color: #FF9800; font-weight: bold; font-size: 16px;")
+
+        # Nyerő pozíciók kiemelése (ha van győztes)
+        if self.winner is not None and self.winning_positions:
+            self.highlight_winning_positions()
 
         # Gombok letiltása
         for button in self.board_buttons:
@@ -347,16 +454,28 @@ class TicTacToeGUI(QMainWindow):
 
     def start_new_game(self):
         """Új játék indítása"""
+        print("Új játék indítása...")
+
+        # Játék állapot visszaállítása
         self.board = np.zeros((3, 3), dtype=int)
         self.current_player = 1
         self.game_over = False
         self.winner = None
+        self.winning_positions = []
 
         # UI frissítése
-        for button in self.board_buttons:
+        for i, button in enumerate(self.board_buttons):
             button.setText("")
             button.setEnabled(True)
+            # Alapértelmezett stílus visszaállítása
+            button.setStyleSheet(self.default_button_style)
 
-        self.result_text.setText("")
+        # Eredmény törlése
+        if hasattr(self, "result_text"):
+            self.result_text.setText("")
+            self.result_text.setStyleSheet("")
 
+        # Tábla megjelenítés frissítése
         self.update_board_display()
+
+        print("Új játék elindítva!")

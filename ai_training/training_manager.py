@@ -5,6 +5,7 @@ Különböző edzési módok és kiértékelések kezelése
 
 import json
 import os
+import random
 import threading
 import time
 from datetime import datetime
@@ -464,19 +465,19 @@ class TrainingManager:
         return [
             {
                 "name": "Alapok - Random ellenfél",
-                "episodes": 5000,
+                "episodes": 10000,
                 "opponent": "random",
                 "description": "Alapvető stratégiák tanulása random ellenfél ellen",
             },
             {
                 "name": "Fejlesztés - Self-play",
-                "episodes": 10000,
+                "episodes": 30000,
                 "opponent": "self",
                 "description": "Haladó stratégiák fejlesztése self-play módban",
             },
             {
                 "name": "Finomhangolás - Mixed",
-                "episodes": 5000,
+                "episodes": 10000,
                 "opponent": "random",
                 "description": "Végső finomhangolás vegyes ellenfelekkel",
             },

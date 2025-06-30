@@ -299,13 +299,87 @@ class TicTacToeEnvironment:
             float: Jutalom érték
         """
         if winner == self.current_player:
-            return 1.0  # Győzelem
+            # Győzelem - korai győzelem nagyobb jutalom
+            moves_bonus = (10 - self.move_count) * 0.1
+            return 1.0 + moves_bonus
         elif winner is not None:
-            return -1.0  # Vereség
+            # Vereség - korai vereség nagyobb büntetés
+            moves_penalty = (10 - self.move_count) * 0.05
+            return -1.0 - moves_penalty
         elif is_draw:
-            return 0.0  # Döntetlen
+            return 0.5  # Döntetlen pozitív (jobb mint vereség)
         else:
-            return 0.0  # Játék folytatódik
+            # Köztes jutalmak
+            return self.get_positional_reward()
+
+    def get_positional_reward(self) -> float:
+        """Pozicionális jutalmak"""
+        reward = 0.0
+
+        # Központ elfoglalása
+        if self.board[1, 1] == self.current_player:
+            reward += 0.1
+
+        # Sarok pozíciók
+        corners = [(0, 0), (0, 2), (2, 0), (2, 2)]
+        for r, c in corners:
+            if self.board[r, c] == self.current_player:
+                reward += 0.05
+
+        # Két egy sorban (potenciális nyerő helyzet)
+        reward += self.count_two_in_row() * 0.2
+
+        # Ellenfél blokkolása
+        reward += self.count_blocked_opponent() * 0.3
+
+        return reward
+
+    def count_two_in_row(self) -> int:
+        """Két saját jel egy sorban számolása"""
+        count = 0
+        player = self.current_player
+
+        # Sorok, oszlopok, átlók ellenőrzése
+        lines = []
+
+        # Sorok
+        for i in range(3):
+            lines.append([self.board[i, j] for j in range(3)])
+
+        # Oszlopok
+        for j in range(3):
+            lines.append([self.board[i, j] for i in range(3)])
+
+        # Átlók
+        lines.append([self.board[i, i] for i in range(3)])
+        lines.append([self.board[i, 2 - i] for i in range(3)])
+
+        for line in lines:
+            if line.count(player) == 2 and line.count(0) == 1:
+                count += 1
+
+        return count
+
+    def count_blocked_opponent(self) -> int:
+        """Ellenfél blokkolásának számolása"""
+        count = 0
+        opponent = -self.current_player
+
+        # Hasonló logika mint a two_in_row, de ellenfélre
+        lines = []
+
+        for i in range(3):
+            lines.append([self.board[i, j] for j in range(3)])
+        for j in range(3):
+            lines.append([self.board[i, j] for i in range(3)])
+        lines.append([self.board[i, i] for i in range(3)])
+        lines.append([self.board[i, 2 - i] for i in range(3)])
+
+        for line in lines:
+            if line.count(opponent) == 2 and line.count(self.current_player) == 1:
+                count += 1
+
+        return count
 
     def update_game_state(self, winner: Optional[int], is_draw: bool):
         """

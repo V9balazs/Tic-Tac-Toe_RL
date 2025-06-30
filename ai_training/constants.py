@@ -22,11 +22,11 @@ RESULT_ONGOING = None
 # =============================================================================
 
 # Tanulási paraméterek
-LEARNING_RATE = 0.1  # α - tanulási ráta
-DISCOUNT_FACTOR = 0.9  # γ - diszkont faktor
-EPSILON_START = 0.9  # kezdő exploration ráta
+LEARNING_RATE = 0.2  # α - tanulási ráta
+DISCOUNT_FACTOR = 0.99  # γ - diszkont faktor
+EPSILON_START = 0.95  # kezdő exploration ráta
 EPSILON_END = 0.01  # végső exploration ráta
-EPSILON_DECAY = 0.995  # epsilon csökkenési ráta
+EPSILON_DECAY = 0.9998  # epsilon csökkenési ráta
 
 # Edzés paraméterek
 TRAINING_EPISODES = 50000  # edzési epizódok száma
