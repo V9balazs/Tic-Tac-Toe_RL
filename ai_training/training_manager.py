@@ -456,32 +456,45 @@ class TrainingManager:
             }
 
     def get_default_curriculum(self) -> List[Dict[str, Any]]:
-        """
-        Alapértelmezett curriculum szakaszok
-
-        Returns:
-            List[Dict[str, Any]]: Curriculum szakaszok
-        """
+        """Alapértelmezett curriculum"""
         return [
             {
-                "name": "Alapok - Random ellenfél",
-                "episodes": 10000,
-                "opponent": "random",
-                "description": "Alapvető stratégiák tanulása random ellenfél ellen",
+                "name": "Alapok - Könnyű stratégiai ellenfél",
+                "episodes": 15000,
+                "opponent": "strategic_easy",
+                "description": "Alapvető stratégiák tanulása könnyű ellenfél ellen",
             },
             {
-                "name": "Fejlesztés - Self-play",
-                "episodes": 30000,
+                "name": "Fejlesztés - Közepes ellenfél",
+                "episodes": 20000,
+                "opponent": "strategic_medium",
+                "description": "Közepes nehézségű stratégiai ellenfél",
+            },
+            {
+                "name": "Self-play szakasz",
+                "episodes": 25000,
                 "opponent": "self",
-                "description": "Haladó stratégiák fejlesztése self-play módban",
+                "description": "Self-play a komplex stratégiákért",
+            },
+            {
+                "name": "Nehéz ellenfél",
+                "episodes": 15000,
+                "opponent": "strategic_hard",
+                "description": "Nehéz stratégiai ellenfél",
             },
             {
                 "name": "Finomhangolás - Mixed",
                 "episodes": 10000,
-                "opponent": "random",
-                "description": "Végső finomhangolás vegyes ellenfelekkel",
+                "opponent": "mixed",
+                "description": "Vegyes ellenfelek a robusztusságért",
             },
         ]
+
+    def create_strategic_opponent(self, difficulty: str):
+        """Stratégiai ellenfél létrehozása"""
+        difficulty_map = {"strategic_easy": 0.3, "strategic_medium": 0.6, "strategic_hard": 0.9}
+
+        return StrategicOpponent(player=PLAYER_O, difficulty=difficulty_map.get(difficulty, 0.5))
 
     # A save_training_session metódus javítása:
     def save_training_session(self, session_data: Dict[str, Any]):
@@ -1200,6 +1213,82 @@ class TrainingManager:
         """String reprezentáció"""
         sessions_count = len(self.list_training_sessions())
         return f"TrainingManager(sessions: {sessions_count})"
+
+
+# Stratégiai ellenfél
+class StrategicOpponent:
+    """Stratégiai ellenfél (nem random)"""
+
+    def __init__(self, player: int, difficulty: float = 0.8):
+        self.player = player
+        self.difficulty = difficulty
+
+    def choose_action(self, board, valid_actions, env, training=True):
+        """Stratégiai akció választás"""
+
+        # Nehézségi szint alapján random esély
+        if random.random() > self.difficulty:
+            return random.choice(valid_actions)
+
+        # 1. Nyerő lépés keresése
+        winning_move = self.find_winning_move(env)
+        if winning_move is not None:
+            return winning_move
+
+        # 2. Ellenfél blokkolása
+        blocking_move = self.find_blocking_move(env)
+        if blocking_move is not None:
+            return blocking_move
+
+        # 3. Stratégiai pozíciók
+        strategic_moves = self.get_strategic_moves(env)
+        if strategic_moves:
+            return strategic_moves[0]
+
+        return random.choice(valid_actions)
+
+    def find_winning_move(self, env):
+        """Nyerő lépés keresése"""
+        for action in env.get_valid_actions():
+            temp_env = env.clone()
+            temp_env.step(action)
+            if temp_env.check_winner() == self.player:
+                return action
+        return None
+
+    def find_blocking_move(self, env):
+        """Ellenfél blokkolása"""
+        opponent = -self.player
+        for action in env.get_valid_actions():
+            temp_env = env.clone()
+            # Szimuláljuk az ellenfél lépését
+            temp_env.current_player = opponent
+            temp_env.step(action)
+            if temp_env.check_winner() == opponent:
+                return action
+        return None
+
+    def get_strategic_moves(self, env):
+        """Stratégiai lépések prioritás szerint"""
+        moves = []
+
+        # Központ (4-es pozíció)
+        if env.is_valid_action(4):
+            moves.append(4)
+
+        # Sarkok (0,2,6,8)
+        corners = [0, 2, 6, 8]
+        for corner in corners:
+            if env.is_valid_action(corner):
+                moves.append(corner)
+
+        # Oldalak (1,3,5,7)
+        sides = [1, 3, 5, 7]
+        for side in sides:
+            if env.is_valid_action(side):
+                moves.append(side)
+
+        return moves
 
 
 # Segédfüggvények

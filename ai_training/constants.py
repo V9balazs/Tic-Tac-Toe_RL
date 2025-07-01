@@ -26,13 +26,20 @@ LEARNING_RATE = 0.2  # α - tanulási ráta
 DISCOUNT_FACTOR = 0.99  # γ - diszkont faktor
 EPSILON_START = 0.95  # kezdő exploration ráta
 EPSILON_END = 0.01  # végső exploration ráta
-EPSILON_DECAY = 0.9998  # epsilon csökkenési ráta
+EPSILON_DECAY = 0.9995  # epsilon csökkenési ráta
 
 # Edzés paraméterek
 TRAINING_EPISODES = 50000  # edzési epizódok száma
 EVALUATION_INTERVAL = 1000  # értékelési gyakoriság
 SAVE_INTERVAL = 5000  # mentési gyakoriság
 BATCH_SIZE = 32  # batch méret (ha szükséges)
+
+# Új konstansok hozzáadása:
+POSITIONAL_REWARDS = True
+CENTER_REWARD = 0.1
+CORNER_REWARD = 0.05
+TWO_IN_ROW_REWARD = 0.3
+BLOCK_OPPONENT_REWARD = 0.4
 
 # Q-táblázat inicializálás
 INITIAL_Q_VALUE = 0.0  # kezdő Q-értékek

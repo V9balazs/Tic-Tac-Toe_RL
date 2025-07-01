@@ -77,6 +77,13 @@ class QLearningAgent:
         self.epsilon_end = epsilon_end
         self.epsilon_decay = epsilon_decay
         self.use_symmetries = use_symmetries
+        # Experience replay javítása
+        self.experience_buffer = deque(maxlen=50000)
+        self.replay_batch_size = 64
+        self.min_replay_size = 1000
+        # Prioritized experience replay
+        self.priority_buffer = []
+        self.use_priority_replay = True
 
         # Q-táblázat: {state_key: {action: q_value}}
         self.q_table = defaultdict(lambda: defaultdict(lambda: INITIAL_Q_VALUE))
@@ -186,45 +193,23 @@ class QLearningAgent:
 
         return action
 
-    def update_q_value(
-        self,
-        state: np.ndarray,
-        action: int,
-        reward: float,
-        next_state: np.ndarray,
-        next_valid_actions: List[int],
-        done: bool,
-        env: Optional[TicTacToeEnvironment] = None,
-    ):
-        """
-        Q-érték frissítése Bellman egyenlettel
-
-        Args:
-            state: Jelenlegi állapot
-            action: Végrehajtott akció
-            reward: Kapott jutalom
-            next_state: Következő állapot
-            next_valid_actions: Következő állapot érvényes akciói
-            done: Epizód véget ért-e
-            env: Environment
-        """
+    def update_q_value(self, state, action, reward, next_state, next_valid_actions, done, env):
+        """Q-érték frissítés"""
         state_key = self.get_state_key(state, env)
         current_q = self.get_q_value(state_key, action)
 
         if done:
-            # Terminális állapot: nincs jövőbeli jutalom
             target_q = reward
         else:
-            # Következő állapot legjobb Q-értéke
             next_state_key = self.get_state_key(next_state, env)
-
             if next_valid_actions:
                 max_next_q = max(self.get_q_value(next_state_key, next_action) for next_action in next_valid_actions)
             else:
                 max_next_q = 0.0
-
-            # Bellman egyenlet
             target_q = reward + self.discount_factor * max_next_q
+
+        # TD-error számítása (prioritized replay-hez)
+        td_error = abs(target_q - current_q)
 
         # Q-érték frissítése
         new_q = current_q + self.learning_rate * (target_q - current_q)
@@ -232,28 +217,11 @@ class QLearningAgent:
 
         self.stats["q_updates"] += 1
 
-    def add_experience(
-        self,
-        state: np.ndarray,
-        action: int,
-        reward: float,
-        next_state: np.ndarray,
-        done: bool,
-        valid_actions: List[int],
-        next_valid_actions: List[int],
-    ):
-        """
-        Tapasztalat hozzáadása a replay bufferhez
+        # ÚJ: TD-error visszaadása
+        return td_error
 
-        Args:
-            state: Állapot
-            action: Akció
-            reward: Jutalom
-            next_state: Következő állapot
-            done: Epizód vége
-            valid_actions: Érvényes akciók
-            next_valid_actions: Következő érvényes akciók
-        """
+    def add_experience(self, state, action, reward, next_state, done, valid_actions, next_valid_actions):
+        """Experience hozzáadás prioritással"""
         experience = {
             "state": state.copy(),
             "action": action,
@@ -262,32 +230,57 @@ class QLearningAgent:
             "done": done,
             "valid_actions": valid_actions.copy(),
             "next_valid_actions": next_valid_actions.copy(),
+            "priority": 1.0,
         }
         self.experience_buffer.append(experience)
 
-    def replay_experience(self, env: Optional[TicTacToeEnvironment] = None):
-        """
-        Experience replay - korábbi tapasztalatok újrajátszása
-
-        Args:
-            env: Environment
-        """
-        if len(self.experience_buffer) < self.replay_batch_size:
+    def replay_experience(self, env):
+        """Experience replay"""
+        if len(self.experience_buffer) < self.min_replay_size:
             return
 
-        # Random batch választása
-        batch = random.sample(self.experience_buffer, self.replay_batch_size)
+        # Több replay iteráció
+        for _ in range(3):  # volt: 1
+            if self.use_priority_replay:
+                batch = self.sample_priority_batch()
+            else:
+                batch = random.sample(self.experience_buffer, min(self.replay_batch_size, len(self.experience_buffer)))
 
-        for experience in batch:
-            self.update_q_value(
-                experience["state"],
-                experience["action"],
-                experience["reward"],
-                experience["next_state"],
-                experience["next_valid_actions"],
-                experience["done"],
-                env,
-            )
+            for experience in batch:
+                td_error = self.update_q_value(
+                    experience["state"],
+                    experience["action"],
+                    experience["reward"],
+                    experience["next_state"],
+                    experience["next_valid_actions"],
+                    experience["done"],
+                    env,
+                )
+                # Prioritás frissítése
+                experience["priority"] = td_error + 0.01
+
+    def sample_priority_batch(self):
+        """ÚJ METÓDUS - Prioritásos mintavételezés"""
+        if not self.experience_buffer:
+            return []
+
+        # Prioritások alapján súlyozott mintavételezés
+        priorities = [exp.get("priority", 1.0) for exp in self.experience_buffer]
+        total_priority = sum(priorities)
+
+        if total_priority == 0:
+            return random.sample(self.experience_buffer, min(self.replay_batch_size, len(self.experience_buffer)))
+
+        probabilities = [p / total_priority for p in priorities]
+
+        batch_indices = np.random.choice(
+            len(self.experience_buffer),
+            size=min(self.replay_batch_size, len(self.experience_buffer)),
+            p=probabilities,
+            replace=False,
+        )
+
+        return [self.experience_buffer[i] for i in batch_indices]
 
     def decay_epsilon(self):
         """Epsilon csökkentése"""

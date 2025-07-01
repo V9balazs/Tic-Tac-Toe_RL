@@ -287,34 +287,34 @@ class TicTacToeGUI(QMainWindow):
             # Fallback: random lépés
             # self.random_ai_move()
 
-    def random_ai_move(self):
-        """Fallback random AI lépés"""
-        if self.game_over:
-            return
+    # def random_ai_move(self):
+    #     """Fallback random AI lépés"""
+    #     if self.game_over:
+    #         return
 
-        # Elérhető pozíciók keresése
-        available_moves = []
-        for i in range(3):
-            for j in range(3):
-                if self.board[i][j] == 0:
-                    available_moves.append((i, j))
+    #     # Elérhető pozíciók keresése
+    #     available_moves = []
+    #     for i in range(3):
+    #         for j in range(3):
+    #             if self.board[i][j] == 0:
+    #                 available_moves.append((i, j))
 
-        if available_moves:
-            import random
+    #     if available_moves:
+    #         import random
 
-            row, col = random.choice(available_moves)
+    #         row, col = random.choice(available_moves)
 
-            # AI lépés végrehajtása
-            self.board[row][col] = self.current_player
-            self.update_board_display()
+    #         # AI lépés végrehajtása
+    #         self.board[row][col] = self.current_player
+    #         self.update_board_display()
 
-            # Játék vége ellenőrzése
-            if self.check_winner() or self.is_board_full():
-                self.end_game()
-                return
+    #         # Játék vége ellenőrzése
+    #         if self.check_winner() or self.is_board_full():
+    #             self.end_game()
+    #             return
 
-            # Játékos váltás
-            self.current_player *= -1
+    #         # Játékos váltás
+    #         self.current_player *= -1
 
     def update_board_display(self):
         """Játéktábla megjelenítésének frissítése"""
@@ -414,13 +414,148 @@ class TicTacToeGUI(QMainWindow):
 
     def start_ai_training(self):
         """AI edzés indítása"""
-        from ai_training.training_dialog import TrainingDialog
+        if not self.training_manager:
+            QMessageBox.warning(self, "Hiba", "AI komponensek nem elérhetők!")
+            return
 
-        dialog = TrainingDialog(self.training_manager, self)
-        if dialog.exec() == QMessageBox.DialogCode.Accepted:
-            # Új modell betöltése az edzés után
-            self.ai_agent = self.training_manager.load_best_agent()
-            QMessageBox.information(self, "Edzés", "AI edzés befejezve!")
+        # Edzési opciók dialog
+        reply = QMessageBox.question(
+            self,
+            "AI Edzés",
+            "Milyen típusú edzést szeretnél?\n\n"
+            "Yes = Gyors edzés (20k epizód)\n"
+            "No = Teljes curriculum (75k epizód)\n"
+            "Cancel = Mégse",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+        )
+
+        if reply == QMessageBox.StandardButton.Cancel:
+            return
+
+        try:
+            if reply == QMessageBox.StandardButton.Yes:
+                # Gyors edzés - javított paraméterekkel
+                self.run_quick_training()
+            else:
+                # Teljes curriculum
+                self.run_full_curriculum()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hiba", f"Edzési hiba: {str(e)}")
+
+    def run_quick_training(self):
+        """Gyors edzés javított paraméterekkel"""
+        progress_dialog = QProgressDialog("AI edzés folyamatban...", "Megszakítás", 0, 100, self)
+        progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        progress_dialog.show()
+
+        def progress_callback(episode, stats):
+            progress = int((episode / 20000) * 100)
+            progress_dialog.setValue(progress)
+            progress_dialog.setLabelText(
+                f"Epizód: {episode}/20000\n" f"Győzelmi arány: {stats.get('win_rate', 0):.1%}"
+            )
+            QApplication.processEvents()
+            return not progress_dialog.wasCanceled()
+
+        # Javított paraméterekkel
+        training_config = {
+            "training_type": "strategic_mixed",
+            "num_episodes": 20000,
+            "agent_params": {
+                "learning_rate": 0.2,
+                "discount_factor": 0.99,
+                "epsilon_start": 0.95,
+                "epsilon_end": 0.01,
+                "epsilon_decay": 0.9998,
+                "use_symmetries": True,
+            },
+        }
+
+        results = self.training_manager.run_training(**training_config, progress_callback=progress_callback)
+
+        progress_dialog.close()
+
+        # Eredmény megjelenítése
+        win_rate = results["results"]["final_evaluation"]["win_rate"]
+        QMessageBox.information(
+            self,
+            "Edzés befejezve",
+            f"Gyors edzés befejezve!\n"
+            f"Végső győzelmi arány: {win_rate:.1%}\n"
+            f"Edzési idő: {results['training_duration']:.1f} másodperc",
+        )
+
+        # AI agent frissítése
+        self.ai_agent = self.training_manager.load_best_agent()
+
+    def run_full_curriculum(self):
+        """Teljes curriculum edzés"""
+        progress_dialog = QProgressDialog("Curriculum edzés folyamatban...", "Megszakítás", 0, 100, self)
+        progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        progress_dialog.show()
+
+        total_episodes = 75000
+        current_episode = 0
+
+        def progress_callback(episode, stats):
+            nonlocal current_episode
+            current_episode = episode
+            progress = int((current_episode / total_episodes) * 100)
+            progress_dialog.setValue(progress)
+            progress_dialog.setLabelText(
+                f"Epizód: {current_episode}/{total_episodes}\n" f"Győzelmi arány: {stats.get('win_rate', 0):.1%}"
+            )
+            QApplication.processEvents()
+            return not progress_dialog.wasCanceled()
+
+        # Javított curriculum
+        curriculum_stages = [
+            {
+                "name": "Alapok - Stratégiai könnyű",
+                "episodes": 15000,
+                "opponent": "strategic_easy",
+                "description": "Alapvető stratégiák tanulása",
+            },
+            {
+                "name": "Fejlesztés - Stratégiai közepes",
+                "episodes": 20000,
+                "opponent": "strategic_medium",
+                "description": "Közepes nehézségű ellenfél",
+            },
+            {
+                "name": "Self-play szakasz",
+                "episodes": 25000,
+                "opponent": "self",
+                "description": "Self-play a komplex stratégiákért",
+            },
+            {
+                "name": "Finomhangolás - Nehéz ellenfél",
+                "episodes": 15000,
+                "opponent": "strategic_hard",
+                "description": "Nehéz stratégiai ellenfél",
+            },
+        ]
+
+        results = self.training_manager.curriculum_training(curriculum_stages, progress_callback=progress_callback)
+
+        progress_dialog.close()
+
+        # Eredmény megjelenítése
+        final_stage = results["stages"][-1]
+        win_rate = final_stage["result"]["final_evaluation"]["win_rate"]
+
+        QMessageBox.information(
+            self,
+            "Curriculum befejezve",
+            f"Teljes curriculum edzés befejezve!\n"
+            f"Végső győzelmi arány: {win_rate:.1%}\n"
+            f"Összes epizód: {results['total_episodes']}\n"
+            f"Edzési idő: {results.get('training_duration', 0):.1f} másodperc",
+        )
+
+        # AI agent frissítése
+        self.ai_agent = self.training_manager.load_best_agent()
 
     def is_board_full(self):
         """Ellenőrzi, hogy a tábla tele van-e"""
