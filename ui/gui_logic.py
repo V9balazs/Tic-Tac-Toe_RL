@@ -198,33 +198,26 @@ class TicTacToeGUI(QMainWindow):
             self.training_manager = TrainingManager()
             self.ai_agent = None
 
-            # Elérhető modellek listázása
-            available_models = self.training_manager.list_available_models()
-
-            if available_models:
-                print(f"Elérhető modellek: {len(available_models)}")
-                for i, model in enumerate(available_models[:3]):  # Első 3 modell
-                    print(f"  {i+1}. {model['name']} - {model['timestamp']}")
-
             # Próbáljuk betölteni a legjobb modellt
-            try:
-                self.ai_agent = self.training_manager.load_best_agent()
-                if self.ai_agent:
-                    print("AI modell sikeresen betöltve")
-                    # Modell tesztelése
-                    test_result = self.ai_agent.evaluate_against_random(100)
-                    print(f"AI teljesítmény teszt: {test_result['win_rate']:.1%} győzelmi arány")
-                else:
-                    print("Nincs betölthető AI modell")
-            except Exception as e:
-                print(f"Hiba az AI betöltésekor: {e}")
-                self.ai_agent = None
+            self.ai_agent = self.training_manager.load_best_agent()
+            if self.ai_agent:
+                print("Legjobb AI modell betöltve")
+                # Státusz frissítése a GUI-ban
+                if hasattr(self, "statusbar"):
+                    self.statusbar.showMessage("AI modell betöltve", 3000)
+            else:
+                print("Nincs betölthető AI modell - új edzés szükséges")
+                if hasattr(self, "statusbar"):
+                    self.statusbar.showMessage("Nincs AI modell - edzés szükséges", 5000)
 
         except Exception as e:
-            print(f"Hiba az AI komponensek inicializálásakor: {e}")
-            # Fallback: None értékek
-            self.training_manager = None
-            self.ai_agent = None
+            print(f"Hiba az AI inicializálásakor: {e}")
+            QMessageBox.warning(
+                self,
+                "AI inicializálási hiba",
+                f"Nem sikerült inicializálni az AI komponenseket:\n{str(e)}\n\n"
+                f"Az edzési funkciók nem lesznek elérhetők.",
+            )
 
     def make_move(self, row, col):
         """Játékos lépése"""
@@ -245,15 +238,28 @@ class TicTacToeGUI(QMainWindow):
         if self.game_mode.currentText() == "Ember vs AI" and self.current_player == PLAYER_O:
             QTimer.singleShot(500, self.ai_move)
 
-    def on_game_mode_changed(self, mode):
-        """Játék mód változása"""
-        print(f"Játék mód változott: {mode}")
-        # Új játék indítása mód váltáskor
-        self.start_new_game()
+    def on_game_mode_changed(self):
+        """Játékmód változás kezelése"""
+        current_mode = self.game_mode.currentText()
+
+        if current_mode == "Ember vs AI" and not self.ai_agent:
+            # Figyelmeztetés ha nincs AI modell
+            QMessageBox.information(
+                self,
+                "AI modell hiányzik",
+                "Nincs betöltött AI modell!\n\n"
+                "Kérlek indíts egy edzést az 'AI Edzés' gombbal, "
+                "vagy a program egyszerű stratégiai logikát fog használni.",
+            )
 
     def ai_move(self):
-        """AI lépése"""
-        if self.game_over or not self.ai_agent:
+        """AI lépése - jobb hibakezelés"""
+        if self.game_over:
+            return
+
+        if not self.ai_agent:
+            # Fallback: egyszerű stratégiai lépés
+            self.strategic_fallback_move()
             return
 
         try:
@@ -284,8 +290,75 @@ class TicTacToeGUI(QMainWindow):
 
         except Exception as e:
             print(f"Hiba az AI lépésekor: {e}")
-            # Fallback: random lépés
-            # self.random_ai_move()
+            # Fallback: stratégiai lépés
+            self.strategic_fallback_move()
+
+    def strategic_fallback_move(self):
+        """Stratégiai fallback lépés ha az AI nem működik"""
+        if self.game_over:
+            return
+
+        # Elérhető pozíciók
+        available_moves = []
+        for i in range(3):
+            for j in range(3):
+                if self.board[i][j] == 0:
+                    available_moves.append((i, j))
+
+        if not available_moves:
+            return
+
+        # 1. Nyerő lépés keresése
+        for row, col in available_moves:
+            test_board = self.board.copy()
+            test_board[row][col] = self.current_player
+            if self.check_winner_on_board(test_board) == self.current_player:
+                self.execute_move(row, col)
+                return
+
+        # 2. Ellenfél blokkolása
+        opponent = -self.current_player
+        for row, col in available_moves:
+            test_board = self.board.copy()
+            test_board[row][col] = opponent
+            if self.check_winner_on_board(test_board) == opponent:
+                self.execute_move(row, col)
+                return
+
+        # 3. Stratégiai pozíciók (központ, sarkok, oldalak)
+        strategic_positions = [
+            (1, 1),  # központ
+            (0, 0),
+            (0, 2),
+            (2, 0),
+            (2, 2),  # sarkok
+            (0, 1),
+            (1, 0),
+            (1, 2),
+            (2, 1),  # oldalak
+        ]
+
+        for row, col in strategic_positions:
+            if (row, col) in available_moves:
+                self.execute_move(row, col)
+                return
+
+        # 4. Random fallback
+        import random
+
+        row, col = random.choice(available_moves)
+        self.execute_move(row, col)
+
+    def execute_move(self, row, col):
+        """Lépés végrehajtása és játék állapot frissítése"""
+        self.board[row][col] = self.current_player
+        self.update_board_display()
+
+        if self.check_winner() or self.is_board_full():
+            self.end_game()
+            return
+
+        self.current_player *= -1
 
     # def random_ai_move(self):
     #     """Fallback random AI lépés"""
@@ -413,38 +486,52 @@ class TicTacToeGUI(QMainWindow):
             button.setStyleSheet(winning_style)
 
     def start_ai_training(self):
-        """AI edzés indítása"""
-        if not self.training_manager:
-            QMessageBox.warning(self, "Hiba", "AI komponensek nem elérhetők!")
-            return
-
-        # Edzési opciók dialog
-        reply = QMessageBox.question(
-            self,
-            "AI Edzés",
-            "Milyen típusú edzést szeretnél?\n\n"
-            "Yes = Gyors edzés (20k epizód)\n"
-            "No = Teljes curriculum (75k epizód)\n"
-            "Cancel = Mégse",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
-        )
-
-        if reply == QMessageBox.StandardButton.Cancel:
-            return
-
+        """AI edzés indítása - háttérszálakkal"""
         try:
-            if reply == QMessageBox.StandardButton.Yes:
-                # Gyors edzés - javított paraméterekkel
-                self.run_quick_training()
-            else:
-                # Teljes curriculum
-                self.run_full_curriculum()
+            # Training manager inicializálása ha szükséges
+            if not hasattr(self, "training_manager"):
+                self.init_ai_components()
 
+            # Training dialog megnyitása
+            from PyQt6.QtWidgets import QDialog, QMessageBox
+
+            from ai_training.training_dialog import TrainingDialog
+
+            dialog = TrainingDialog(self.training_manager, self)
+            result = dialog.exec()
+
+            # Ha az edzés sikeresen befejeződött, frissítjük az AI-t
+            if result == QDialog.DialogCode.Accepted:
+                try:
+                    # Legjobb modell újratöltése
+                    self.ai_agent = self.training_manager.load_best_agent()
+                    if self.ai_agent:
+                        QMessageBox.information(
+                            self,
+                            "AI frissítve",
+                            "Az új AI modell sikeresen betöltve!\n" "Most már az újonnan edzett AI ellen játszhatsz.",
+                        )
+                    else:
+                        QMessageBox.warning(
+                            self, "Figyelmeztetés", "Az edzés befejeződött, de nem sikerült betölteni az új modellt."
+                        )
+                except Exception as e:
+                    QMessageBox.warning(self, "Modell betöltési hiba", f"Hiba az új modell betöltésekor: {str(e)}")
+
+        except ImportError:
+            QMessageBox.critical(
+                self,
+                "Hiba",
+                "A training dialog nem található!\n" "Ellenőrizd, hogy a training_dialog.py fájl létezik.",
+            )
         except Exception as e:
-            QMessageBox.critical(self, "Hiba", f"Edzési hiba: {str(e)}")
+            QMessageBox.critical(self, "Edzési hiba", f"Hiba az edzés indításakor: {str(e)}")
 
     def run_quick_training(self):
         """Gyors edzés javított paraméterekkel"""
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QProgressDialog
+
         progress_dialog = QProgressDialog("AI edzés folyamatban...", "Megszakítás", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
         progress_dialog.show()
@@ -491,6 +578,8 @@ class TicTacToeGUI(QMainWindow):
 
     def run_full_curriculum(self):
         """Teljes curriculum edzés"""
+        from PyQt6.QtWidgets import QProgressDialog
+
         progress_dialog = QProgressDialog("Curriculum edzés folyamatban...", "Megszakítás", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
         progress_dialog.show()
@@ -562,30 +651,35 @@ class TicTacToeGUI(QMainWindow):
         return not any(0 in row for row in self.board)
 
     def end_game(self):
-        """Játék befejezése"""
+        """JAVÍTOTT Játék befejezése - jobb eredmény megjelenítés"""
         self.game_over = True
 
-        print(f"Játék vége! Győztes: {self.winner}")
+        # Eredmény meghatározása
+        if self.winner == 1:
+            result_text = "X nyert! 🎉"
+            if self.game_mode.currentText() == "Ember vs AI":
+                result_text = "Te nyertél! 🎉"
+        elif self.winner == -1:
+            result_text = "O nyert! 🎉"
+            if self.game_mode.currentText() == "Ember vs AI":
+                result_text = "Az AI nyert! 🤖"
+        else:
+            result_text = "Döntetlen! 🤝"
 
-        # Eredmény megjelenítése a result_text label-en
+        # Eredmény megjelenítése ha van result_text widget
         if hasattr(self, "result_text"):
-            if self.winner == 1:
-                self.result_text.setText("X nyert!")
-                self.result_text.setStyleSheet("color: #2196F3; font-weight: bold; font-size: 16px;")
-            elif self.winner == -1:
-                self.result_text.setText("O nyert!")
-                self.result_text.setStyleSheet("color: #F44336; font-weight: bold; font-size: 16px;")
-            else:
-                self.result_text.setText("Döntetlen!")
-                self.result_text.setStyleSheet("color: #FF9800; font-weight: bold; font-size: 16px;")
+            self.result_text.setText(result_text)
 
-        # Nyerő pozíciók kiemelése (ha van győztes)
-        if self.winner is not None and self.winning_positions:
-            self.highlight_winning_positions()
+        # Státusz bar frissítése
+        if hasattr(self, "statusbar"):
+            self.statusbar.showMessage(result_text, 10000)
 
         # Gombok letiltása
         for button in self.board_buttons:
             button.setEnabled(False)
+
+        # Győztes pozíciók kiemelése (opcionális)
+        self.highlight_winning_positions()
 
     def start_new_game(self):
         """Új játék indítása"""
