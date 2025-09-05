@@ -20,7 +20,7 @@ Tic-Tac-Toe Reinforcement Learning
 
   Technológiai stack
 
-  - Python 3.8+ - Főnyelv
+  - Python - Főnyelv
   - PyQt6 - Modern GUI framework
   - NumPy - Numerikus számítások és mátrix műveletek
   - Matplotlib - Edzési grafikonok és vizualizáció
