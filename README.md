@@ -3,12 +3,6 @@ Tic-Tac-Toe Reinforcement Learning
   Egy modern PyQt6-alapú Tic-Tac-Toe játék megerősítéses tanulással (Reinforcement Learning),
   amely Q-learning algoritmust használ intelligens AI ellenfél edzéséhez.
 
-  Mi ez a projekt?
-
-  Ez egy oktatási célú projekt, amely bemutatja a megerősítéses tanulás alapjait egy klassikus
-  játék kontextusában. Az AI agent Q-learning algoritmussal tanul meg optimális stratégiákat a
-  Tic-Tac-Toe játékban.
-
   Főbb funkciók
 
   - Interaktív GUI: Modern PyQt6 felhasználói felület
